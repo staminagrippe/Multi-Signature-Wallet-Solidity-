@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract MultiSigWallet {
+    address[] public owners;
+    uint public requiredSignatures;
+    uint public transactionCount;
+
+    struct Transaction {
+        address destination;
+        uint value;
+        bool executed;
+        uint confirmations;
+    }
+
+    mapping(uint => Transaction) public transactions;
+    mapping(uint => mapping(address => bool)) public confirmations;
+
+    constructor(address[] memory _owners, uint _requiredSignatures) {
+        owners = _owners;
+        requiredSignatures = _requiredSignatures;
+    }
+
+    function submitTransaction(address destination, uint value) public {
+        transactionCount++;
+        transactions[transactionCount] = Transaction({
+            destination: destination,
+            value: value,
+            executed: false,
+            confirmations: 0
+        });
+    }
+
+    function confirmTransaction(uint transactionId) public {
+        require(!confirmations[transactionId][msg.sender], "Already confirmed");
+        confirmations[transactionId][msg.sender] = true;
+        transactions[transactionId].confirmations++;
+
+        if (transactions[transactionId].confirmations >= requiredSignatures) {
+            executeTransaction(transactionId);
+        }
+    }
+
+    function executeTransaction(uint transactionId) internal {
+        Transaction storage transaction = transactions[transactionId];
+        require(!transaction.executed, "Transaction already executed");
+        transaction.executed = true;
+        payable(transaction.destination).transfer(transaction.value);
+    }
+
+    receive() external payable {}
+}
